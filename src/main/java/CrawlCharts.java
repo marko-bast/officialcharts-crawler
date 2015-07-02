@@ -4,15 +4,37 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 import java.io.File;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @author Marko Bastovanovic (markob@vast.com)
  */
 
 public class CrawlCharts {
-    public static final String CHART_HOME = "http://www.officialcharts.com/charts/dance-singles-chart/";
+    public static final String [] LOCATION_HOME = new String[] {
+            "http://www.apartmanija.hr/pretraga/apartmani/istra++osobe:3+2.",
+            "http://www.apartmanija.hr/pretraga/apartmani/kvarner-i-gorje++osobe:3+3.",
+            "http://www.apartmanija.hr/pretraga/apartmani/otoci+krk+osobe:3+11.117",
+            "http://www.apartmanija.hr/apartmani/malinska",
+            "http://www.apartmanija.hr/apartmani/silo",
+            "http://www.apartmanija.hr/apartmani/pinezic",
+            "http://www.apartmanija.hr/apartmani/punat",
+            "http://www.apartmanija.hr/apartmani/krk-cizici",
+            "http://www.apartmanija.hr/apartmani/porat",
+            "http://www.apartmanija.hr/apartmani/baska",
+            "http://www.apartmanija.hr/apartmani/glavotok",
+            "http://www.apartmanija.hr/apartmani/dobrinj",
+            "http://www.apartmanija.hr/apartmani/njivice",
+            "http://www.apartmanija.hr/apartmani/klimno",
+            "http://www.apartmanija.hr/apartmani/jurandvor",
+            "http://www.apartmanija.hr/apartmani/vrbnik",
+            "http://www.apartmanija.hr/apartmani/omisalj"
+
+    };
+
     // next to process is je http://www.officialcharts.com/charts/dance-singles-chart/20091031/104
-    public static final String STORE_LOC = "/tmp/official_charts";
+    public static final String STORE_LOC = "/tmp/apartmanija-hr";
 
     public static void main (String [] args){
         try{
@@ -25,10 +47,14 @@ public class CrawlCharts {
                 }
             }
 
-            String nextUrl = getNextChartIdAndDownloadThisOne(CHART_HOME);
-            while (nextUrl != null){
-                System.out.println("Processing " + nextUrl);
-                nextUrl = getNextChartIdAndDownloadThisOne(nextUrl);
+            for (String one_location : LOCATION_HOME) {
+                for (String url : getApartmentsUrls(one_location)) {
+                    System.out.println("Processing " + url);
+                    FileUtils.writeStringToFile(
+                            new File(STORE_LOC + "/" + java.net.URLEncoder.encode(url, "UTF-8")),
+                            Jsoup.connect(url).get().toString()
+                    );
+                }
             }
 
             System.out.println("Done");
@@ -37,20 +63,19 @@ public class CrawlCharts {
         }
     }
 
-    private static String getNextChartIdAndDownloadThisOne(String url) throws Exception{
+    // gets all apartments url in location page
+    private static Set<String> getApartmentsUrls(String url) throws Exception{
+        Set<String> toReturn = new HashSet<>();
         Document document = Jsoup.connect(url).get();
 
-        String thisChartID = document.body().getElementById("this-chart-id").val();
-        if (thisChartID == null){
-            throw new RuntimeException("Can't determine this-chart-id for \n\n" + document);
+        for (Element el : document.body().getElementById("content_col_left").getElementsByClass("prop_cont")) {
+            toReturn.add(el.getElementsByClass("prop_img").first().select("a").attr("href"));
         }
-        FileUtils.writeStringToFile(new File(STORE_LOC + "/" + thisChartID), document.toString());
+        for (Element el : document.body().getElementById("content_col_left").getElementsByClass("prop_cont featured")) {
+            toReturn.add(el.getElementsByClass("prop_img").first().select("a").attr("href"));
+        }
 
-        for (Element element : document.body().getAllElements()) {
-            if (element.className().equals("prev chart-date-directions")){
-                return element.attr("abs:href");
-            }
-        }
-        return null;
+        System.out.println("Found " + toReturn.size() + " apartment urls");
+        return toReturn;
     }
 }

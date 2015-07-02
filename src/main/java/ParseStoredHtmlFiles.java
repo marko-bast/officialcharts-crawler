@@ -4,11 +4,11 @@ import org.apache.commons.io.FileUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
 import java.io.File;
-import java.util.Map;
-import java.util.TreeMap;
+import java.net.URLDecoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author Marko Bastovanovic (markob@vast.com)
@@ -21,39 +21,35 @@ public class ParseStoredHtmlFiles {
 
             //noinspection ConstantConditions
             for (File file: new File(CrawlCharts.STORE_LOC).listFiles()) {
-                if (!(file.toString().contains("-2015") || file.toString().contains("-2014"))){
-                    continue;
-                }
-                System.out.println(file);
+                Integer distance = null;
+                boolean pescana = false;
+                //System.out.println("Processing " + URLDecoder.decode(file.getName(), "UTF-8"));
                 Document document = Jsoup.parse(FileUtils.readFileToString(file));
-                Elements chartPositionsTable = document.body()
-                        .getElementById("container")
-                        .getElementById("main")
-                        .getElementsByAttributeValue("class", "page").first()
-                        .getElementsByAttributeValue("class", "grid").first()
-                        .getElementsByAttributeValue("class", "grid__cell unit-2-3--desktop").first()
-                        .getElementsByAttributeValue("class", "chart").first()
-                        .getElementsByAttributeValue("class", "chart-positions").first().children();
+                Pattern distanceP = Pattern.compile("<li>Plaža: <span>([0-9]+) m</span></li>");
+                Pattern pescanaP = Pattern.compile("Vrsta plaže.*Pješčana", Pattern.DOTALL);
+                for (Element element : document.body().getElementById("dist").getElementsByClass("pdet_minfo")) {
 
-                for (Element chartPositionsElement: chartPositionsTable.select("tr")) {
-                    Element bla = chartPositionsElement.getElementsByClass("position").first();
-                    if (bla == null){
-                        continue;
+                    Matcher pescanaM = pescanaP.matcher(element.toString());
+                    if (pescanaM.find()){
+                        pescana = true;
                     }
-                    points.add(chartPositionsElement.getElementsByClass("artist").first().text()
-                                    + " - " + chartPositionsElement.getElementsByClass("title").first().text(),
-                            40 - Integer.parseInt(bla.text()));
+
+                    //System.out.println("poc" + element + "kraj");
+                    for (Element subElement : element.getAllElements()) {
+                        if (subElement.className().equals("pdet_minfo_body left")){
+                            Matcher m = distanceP.matcher(subElement.toString());
+                            if (m.find()){
+                                distance = Integer.parseInt(m.group(1));
+                            }
+                        }
+                    }
+                }
+                if (distance != null && distance<=200 && pescana){
+                    System.out.println(URLDecoder.decode(file.getName(), "UTF-8"));
                 }
             }
 
-            TreeMap<Integer, String> sorted = new TreeMap<>();
-            for (Multiset.Entry<String> song : points.entrySet()) {
-                sorted.put(song.getCount(), song.getElement());
-            }
 
-            for (Map.Entry<Integer, String> integerStringEntry : sorted.entrySet()) {
-                System.out.println(integerStringEntry.getKey() + " " + integerStringEntry.getValue());
-            }
         }catch (Exception e){
             throw new RuntimeException(e);
         }
